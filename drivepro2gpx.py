@@ -2,6 +2,31 @@
 
 import base64
 import exiftool
+import numpy as np
+
+
+def get_gps_data(videofile, sample_length=8, dtype=np.uint8):
+    '''
+    Returns the GPS data contained within the videofile.
+    '''
+
+    # make sure dtype is numpy dtype object
+    dtype = np.dtype(dtype)
+
+    # use exiftool to load the gps tag
+    with exiftool.ExifTool() as et:
+        data = et.get_tag('Unknown_gps', args.video)
+
+    # decode the base64 data to a byte-string
+    assert data.startswith('base64:')
+    data = base64.b64decode(data[len('base64:'):])
+
+    # convert the byte string to a numpy array
+    data = np.frombuffer(data, dtype=dtype)
+
+    # and reshape according to sample_length (in bytes)
+    return data.reshape((-1, sample_length//dtype.itemsize))
+
 
 if __name__ == '__main__':
 
@@ -14,15 +39,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    with exiftool.ExifTool() as et:
-        gps = et.get_tag('Unknown_gps', args.video)
-
-    assert gps.startswith('base64:')
-
-    gps = base64.b64decode(gps[len('base64:'):])
-
     # it looks like we get about 8 bytes for every minute of the
     # video, but it's not clear what those bytes correspond to
     # yet
-    for i in range(0, len(gps), 8):
-        print(gps[i:i+8].hex())
+    data = get_gps_data(args.video)
+
+    for row in data:
+        print(row)
